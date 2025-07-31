@@ -37,11 +37,17 @@ app.get('/altegio-reviews', async (req, res) => {
     const filtered = result.data
       .filter(r => r.text && r.text.trim().length > 0)
       .map(r => ({
-        name: r.user_name,
-        text: r.text.trim(),
-        date: r.date.split(' ')[0],
+        name:   r.user_name,
+        text:   r.text.trim(),
+        date:   new Intl.DateTimeFormat('ru-RU', {
+                  day:   'numeric',
+                  month: 'long',
+                  year:  'numeric'
+                })
+                .format(new Date(r.date.split(' ')[0]))
+                .replace(/\sг\.$/, ''),   // удаляем " г."
         rating: r.rating
-      }));
+      }))
 
     cachedReviews = filtered;
     lastFetchTime = now;
