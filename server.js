@@ -11,9 +11,19 @@ const formatDate = (str) => str.split(' ')[0];
 const cors = require('cors');
 app.use(cors());
 
+let cachedReviews = null;
+let lastFetchTime = 0;
+
 app.get('/altegio-reviews', async (req, res) => {
+  const now = Date.now();
+  const cacheTTL = 10 * 60 * 1000; // 10 минут
+
+  if (cachedReviews && (now - lastFetchTime) < cacheTTL) {
+    return res.json(cachedReviews);
+  }
+
   try {
-    const response = await fetch(`${API_URL}?count=10`, {
+    const response = await fetch(`${API_URL}?count=20`, {
       headers: {
         'Authorization': TOKEN,
         'Accept': 'application/vnd.api.v2+json',
@@ -22,23 +32,23 @@ app.get('/altegio-reviews', async (req, res) => {
     });
 
     const result = await response.json();
-
-    if (!result.success) {
-      return res.status(502).json({ error: 'Ошибка в ответе Altegio', details: result });
-    }
+    if (!result.success) return res.status(502).json({ error: 'Altegio error', details: result });
 
     const filtered = result.data
       .filter(r => r.text && r.text.trim().length > 0)
       .map(r => ({
         name: r.user_name,
         text: r.text.trim(),
-        date: formatDate(r.date),
+        date: r.date.split(' ')[0],
         rating: r.rating
       }));
 
-    res.status(200).json(filtered);
+    cachedReviews = filtered;
+    lastFetchTime = now;
+
+    res.json(filtered);
   } catch (error) {
-    console.error('Ошибка при получении отзывов:', error);
+    console.error('Ошибка при запросе к Altegio:', error);
     res.status(500).json({ error: 'Ошибка при получении отзывов' });
   }
 });
