@@ -1,11 +1,18 @@
 {
   "name": "altegio-reviews",
   "version": "1.0.0",
+  "description": "Proxy that fetches and caches salon reviews from the Altegio B2B v1 API.",
+  "main": "server.js",
   "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
-    "express": "^5.1.0",
-    "node-fetch": "^2.6.11"
+    "express": "^5.1.0"
   }
 }
