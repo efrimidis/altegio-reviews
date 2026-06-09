@@ -47,8 +47,10 @@ async function fetchBookStaff(locationId) {
 }
 
 // Available booking time slots for a team member on a given date (YYYY-MM-DD).
-async function fetchBookTimes(locationId, staffId, date) {
-  return apiGet(`/book_times/${locationId}/${staffId}/${date}`, partnerAuth);
+// When serviceId is given, slots are constrained to fit that service's duration.
+async function fetchBookTimes(locationId, staffId, date, serviceId) {
+  const query = serviceId ? `?service_ids%5B%5D=${serviceId}` : '';
+  return apiGet(`/book_times/${locationId}/${staffId}/${date}${query}`, partnerAuth);
 }
 
 module.exports = { fetchReviews, fetchBookStaff, fetchBookTimes };

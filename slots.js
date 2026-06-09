@@ -36,7 +36,7 @@ async function buildStudioBlock(studio, apiDate, nowMs) {
     staff.map(async (member) => {
       let slots;
       try {
-        slots = await fetchBookTimes(studio.locationId, member.id, apiDate);
+        slots = await fetchBookTimes(studio.locationId, member.id, apiDate, config.serviceId);
       } catch (err) {
         console.error(`book_times failed (loc ${studio.locationId}, staff ${member.id}):`, err.message);
         return null;

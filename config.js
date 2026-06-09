@@ -14,8 +14,14 @@ module.exports = {
     { name: '📍 Студия на Шота Руставели', locationId: '764321' },
   ],
 
-  // Latest slot start time to show (HH:MM). Studio closes at 21:00, but a
-  // service may last 30–45 min, so we don't offer starts after 20:30.
+  // Slots are computed for this Altegio service so that only "full" windows
+  // where a 60-min session fits before the next booking are shown. 30/45-min
+  // sessions are sold manually by admins. 13281421 = "Расслабляющий массаж
+  // всего тела (60 минут)" (same id in both studios).
+  serviceId: 13281421,
+
+  // Extra guard on the latest start time (HH:MM). With the 60-min service the
+  // API already won't offer starts past 20:00, so this rarely bites.
   latestSlotTime: '20:30',
 
   // If true and no studio has any free slots, the post is skipped entirely.
