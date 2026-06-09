@@ -14,6 +14,10 @@ module.exports = {
     { name: '📍 Студия на Шота Руставели', locationId: '764321' },
   ],
 
+  // Latest slot start time to show (HH:MM). Studio closes at 21:00, but a
+  // service may last 30–45 min, so we don't offer starts after 20:30.
+  latestSlotTime: '20:30',
+
   // If true and no studio has any free slots, the post is skipped entirely.
   skipIfEmpty: true,
 

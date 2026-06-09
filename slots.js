@@ -6,6 +6,12 @@ const { fetchBookStaff, fetchBookTimes } = require('./altegio');
 const escapeHtml = (s) =>
   String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+const toMinutes = (time) => {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+};
+const LATEST_MINUTES = toMinutes(config.latestSlotTime);
+
 // Date helpers in the configured timezone.
 function dateParts(now = new Date()) {
   const fmt = new Intl.DateTimeFormat('en-CA', {
@@ -35,10 +41,12 @@ async function buildStudioBlock(studio, apiDate, nowMs) {
         console.error(`book_times failed (loc ${studio.locationId}, staff ${member.id}):`, err.message);
         return null;
       }
-      // Keep only future slots, then the earliest available time per hour.
+      // Keep only future slots no later than the cutoff, then the earliest
+      // available time per hour.
       const seenHours = new Set();
       const times = slots
         .filter((s) => new Date(s.datetime).getTime() > nowMs)
+        .filter((s) => toMinutes(s.time) <= LATEST_MINUTES)
         .filter((s) => {
           const hour = s.time.split(':')[0];
           if (seenHours.has(hour)) return false;
