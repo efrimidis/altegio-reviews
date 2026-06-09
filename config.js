@@ -1,24 +1,34 @@
 // Configuration for the daily "free slots" Telegram post.
-// Edit the text in `header` / `footer` freely — {date} is replaced with DD.MM.
-// Dynamic parts (studios → masters → times) are pulled from Altegio automatically.
+// Headers/links below support Telegram HTML. Placeholders:
+//   {date}     -> DD.MM of the targeted day
+//   {discount} -> active discount percent (see `discount` below)
+// Dynamic parts (studios → masters → times, prices) are generated automatically.
 
 module.exports = {
   timezone: 'Asia/Tashkent',
 
   // When to publish (cron in the timezone above). Each schedule targets a day
-  // ('today' | 'tomorrow') and has its own header. {date} -> DD.MM of that day.
+  // ('today' | 'tomorrow') and has its own header.
   postSchedules: [
     {
       cron: '0 20 * * *', // evening: announce tomorrow's windows
       day: 'tomorrow',
-      header: '🌚 🔥 Горящие окна на завтра со скидкой 15%\nна сеансы 60 минут | завтра {date}',
+      header: '🌚 🔥 Горящие окна на завтра со скидкой {discount}%\nна сеансы 60 минут | завтра {date}',
     },
     {
       cron: '0 15 * * *', // afternoon: remaining windows for tonight
       day: 'today',
-      header: '🔥 На сегодня еще остались горящие окошки со скидкой 15% | {date}',
+      header: '🔥 На сегодня еще остались горящие окошки со скидкой {discount}% | {date}',
     },
   ],
+
+  // Discount scales with scarcity: when the post has `scarceThreshold` windows
+  // or fewer (counted across the whole post), bump to the deeper discount.
+  discount: {
+    normal: 15,
+    scarce: 20,
+    scarceThreshold: 4,
+  },
 
   // Studios to include, in display order. locationId = Altegio location/company id.
   studios: [
@@ -39,23 +49,28 @@ module.exports = {
   // If true and no studio has any free slots, the post is skipped entirely.
   skipIfEmpty: true,
 
-  // ----- Author-editable text (supports Telegram HTML) ----------------------
-  footer: [
-    '<blockquote expandable>🔥 Расслабляющий 60 минут - <s>700 000</s> 595 000 сум',
-    '🔥 Расслабляющий 90 минут - <s>800 000</s> 680 000 сум',
-    '',
-    '🔥 Спортивный 60 минут - <s>850 000</s> 722 500 сум',
-    '🔥 Спортивный 90 минут - <s>950 000</s> 807 500 сум',
-    '',
-    '🔥 Лимфодренажный 60 минут - <s>750 000</s> 637 500 сум',
-    '🔥 Лимфодренажный 90 минут - <s>850 000</s> 722 500 сум',
-    '',
-    '🔥 Восстанавливающий 90 минут - <s>850 000</s> 722 500 сум',
-    '',
-    '🔥 Медовый 60 минут - <s>700 000</s> 595 000 сум',
-    '',
-    '🔥 Массаж спины 45 минут - <s>550 000</s> 467 500 сум</blockquote>',
-    '',
+  // ----- Price list (base prices; discount applied at render) ---------------
+  // `null` entries render as a blank separator line. Shown in an expandable
+  // Telegram quote so prices don't dominate the post.
+  priceList: [
+    { name: 'Расслабляющий 60 минут', base: 700000 },
+    { name: 'Расслабляющий 90 минут', base: 800000 },
+    null,
+    { name: 'Спортивный 60 минут', base: 850000 },
+    { name: 'Спортивный 90 минут', base: 950000 },
+    null,
+    { name: 'Лимфодренажный 60 минут', base: 750000 },
+    { name: 'Лимфодренажный 90 минут', base: 850000 },
+    null,
+    { name: 'Восстанавливающий 90 минут', base: 850000 },
+    null,
+    { name: 'Медовый 60 минут', base: 700000 },
+    null,
+    { name: 'Массаж спины 45 минут', base: 550000 },
+  ],
+
+  // ----- Static footer links ------------------------------------------------
+  footerLinks: [
     'Запись <a href="https://b813591.alteg.io/company/1342553/personal/menu?o=m-1">онлайн 🔗</a> или через Telegram:',
     '',
     '<a href="https://t.me/telo_urda">TELO Урда</a> 🐚',

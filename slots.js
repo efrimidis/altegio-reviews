@@ -12,6 +12,22 @@ const toMinutes = (time) => {
 };
 const LATEST_MINUTES = toMinutes(config.latestSlotTime);
 
+// 700000 -> "700 000"
+const fmtMoney = (n) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+// Render the price list (in an expandable quote) with the given discount %.
+function renderFooter(discountPercent) {
+  const priceBlock = config.priceList
+    .map((item) =>
+      item
+        ? `🔥 ${item.name} - <s>${fmtMoney(item.base)}</s> ` +
+          `${fmtMoney(item.base * (1 - discountPercent / 100))} сум`
+        : '',
+    )
+    .join('\n');
+  return `<blockquote expandable>${priceBlock}</blockquote>\n\n${config.footerLinks}`;
+}
+
 // Date helpers in the configured timezone.
 function dateParts(now = new Date()) {
   const fmt = new Intl.DateTimeFormat('en-CA', {
@@ -82,7 +98,15 @@ async function buildSlotsMessage(options = {}) {
     return null;
   }
 
-  const lines = [header.replace('{date}', display)];
+  // Deeper discount when few windows remain (counted across the whole post).
+  const totalSlots = withSlots.reduce(
+    (sum, b) => sum + b.masters.reduce((n, m) => n + m.times.length, 0),
+    0,
+  );
+  const discountPercent =
+    totalSlots <= config.discount.scarceThreshold ? config.discount.scarce : config.discount.normal;
+
+  const lines = [header.replace('{discount}', discountPercent).replace('{date}', display)];
 
   for (const block of withSlots) {
     lines.push('', block.name);
@@ -91,7 +115,7 @@ async function buildSlotsMessage(options = {}) {
     }
   }
 
-  lines.push('', '', config.footer);
+  lines.push('', '', renderFooter(discountPercent));
   return lines.join('\n');
 }
 
