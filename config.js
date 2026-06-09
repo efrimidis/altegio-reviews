@@ -9,16 +9,20 @@ module.exports = {
 
   // When to publish (cron in the timezone above). Each schedule targets a day
   // ('today' | 'tomorrow') and has its own header.
+  // `headerScarce` (optional) is used instead of `header` when the deeper
+  // discount kicks in (few windows left). The "скидка …%" part is bold.
   postSchedules: [
     {
       cron: '0 20 * * *', // evening: announce tomorrow's windows
       day: 'tomorrow',
-      header: '🌚 🔥 Горящие окна на завтра со скидкой {discount}%\nна сеансы 60 минут | завтра {date}',
+      header: '🌚 🔥 Горящие окна на завтра со <b>скидкой {discount}%</b>\nна сеансы 60 минут | завтра {date}',
+      headerScarce: '🌚 🔥 Последние горящие окна на завтра - <b>скидка {discount}%</b>\nна сеансы 60 минут | завтра {date}',
     },
     {
       cron: '0 15 * * *', // afternoon: remaining windows for tonight
       day: 'today',
-      header: '🔥 На сегодня еще остались горящие окошки со скидкой {discount}% | {date}',
+      header: '🔥 На сегодня еще остались горящие окошки со <b>скидкой {discount}%</b> | {date}',
+      headerScarce: '🔥 Последние горящие окна на сегодня - <b>скидка {discount}%</b> | {date}',
     },
   ],
 

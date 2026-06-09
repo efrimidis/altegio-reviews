@@ -81,7 +81,8 @@ async function buildStudioBlock(studio, apiDate, nowMs) {
 // config.skipIfEmpty is set.
 // options: { day: 'today' | 'tomorrow', header: '...' }
 async function buildSlotsMessage(options = {}) {
-  const { day = 'today', header = config.postSchedules[0].header } = options;
+  const schedule = options.day ? options : config.postSchedules[0];
+  const { day } = schedule;
 
   // For 'tomorrow' we target the next calendar day; every slot then lies in the
   // future relative to now, so the same "future-only" filter shows the full day.
@@ -103,10 +104,11 @@ async function buildSlotsMessage(options = {}) {
     (sum, b) => sum + b.masters.reduce((n, m) => n + m.times.length, 0),
     0,
   );
-  const discountPercent =
-    totalSlots <= config.discount.scarceThreshold ? config.discount.scarce : config.discount.normal;
+  const isScarce = totalSlots <= config.discount.scarceThreshold;
+  const discountPercent = isScarce ? config.discount.scarce : config.discount.normal;
+  const headerTemplate = (isScarce && schedule.headerScarce) || schedule.header;
 
-  const lines = [header.replace('{discount}', discountPercent).replace('{date}', display)];
+  const lines = [headerTemplate.replace('{discount}', discountPercent).replace('{date}', display)];
 
   for (const block of withSlots) {
     lines.push('', block.name);
