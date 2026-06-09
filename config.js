@@ -41,7 +41,7 @@ module.exports = {
     '🔥 Лимфодренажный 60 минут - <s>750 000</s> 637 500 сум',
     '🔥 Лимфодренажный 90 минут - <s>850 000</s> 722 500 сум',
     '',
-    'Запись онлайн <a href="https://b813591.alteg.io/company/1342553/personal/menu?o=m-1">🔗</a> или через Telegram:',
+    'Запись <a href="https://b813591.alteg.io/company/1342553/personal/menu?o=m-1">онлайн 🔗</a> или через Telegram:',
     '',
     '<a href="https://t.me/telo_urda">TELO Урда</a> 🐚',
     '',
