@@ -15,8 +15,8 @@ module.exports = {
     {
       cron: '0 20 * * *', // evening: announce tomorrow's windows
       day: 'tomorrow',
-      header: '🌚 🔥 Горящие окна на завтра со <b>скидкой {discount}%</b>\nна сеансы 60 минут | {date}',
-      headerScarce: '🌚 🔥 Последние горящие окна на завтра - <b>скидка {discount}%</b>\nна сеансы 60 минут | {date}',
+      header: '🌚 🔥 Горящие окна на завтра со <b>скидкой {discount}%</b>\nна сеансы от 60 минут | {date}',
+      headerScarce: '🌚 🔥 Последние горящие окна на завтра - <b>скидка {discount}%</b>\nна сеансы от 60 минут | {date}',
     },
     {
       cron: '0 15 * * *', // afternoon: remaining windows for tonight
