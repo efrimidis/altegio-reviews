@@ -28,4 +28,19 @@ async function postToChannel(text) {
   return result.result;
 }
 
-module.exports = { postToChannel, isConfigured };
+async function deleteMessage(messageId) {
+  if (!isConfigured || !messageId) return;
+
+  const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/deleteMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: CHANNEL_ID, message_id: messageId }),
+  });
+
+  const result = await response.json();
+  if (!result.ok) {
+    throw new Error(`Telegram delete error: ${result.description || JSON.stringify(result)}`);
+  }
+}
+
+module.exports = { postToChannel, deleteMessage, isConfigured };

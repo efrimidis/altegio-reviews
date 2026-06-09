@@ -7,6 +7,7 @@ const config = require('./config');
 const { fetchReviews } = require('./altegio');
 const { buildSlotsMessage } = require('./slots');
 const telegram = require('./telegram');
+const state = require('./state');
 
 // --- Configuration ---------------------------------------------------------
 const PORT = process.env.PORT || 3000;
@@ -48,15 +49,31 @@ async function getReviews() {
 }
 
 // --- Slots publishing ------------------------------------------------------
+// Each run supersedes the previous post: the new post (15:00 → today) replaces
+// the evening "tomorrow" post, and vice versa, so the channel never shows a
+// stale offer. Build first so a fetch failure leaves the old post intact.
 async function publishSlots(schedule) {
   const message = await buildSlotsMessage(schedule);
+
+  const prev = state.read();
+  if (prev.messageId) {
+    try {
+      await telegram.deleteMessage(prev.messageId);
+    } catch (err) {
+      console.error('Failed to delete previous post:', err.message);
+    }
+  }
+
   if (!message) {
-    console.log(`No free slots (${schedule.day}) — skipping post.`);
+    state.write({}); // previous offer is gone; nothing relevant to show now
+    console.log(`No free slots (${schedule.day}) — previous post removed.`);
     return { posted: false, reason: 'empty' };
   }
-  await telegram.postToChannel(message);
-  console.log(`Posted free slots (${schedule.day}) to Telegram.`);
-  return { posted: true };
+
+  const sent = await telegram.postToChannel(message);
+  state.write({ messageId: sent.message_id });
+  console.log(`Posted free slots (${schedule.day}) to Telegram (id ${sent.message_id}).`);
+  return { posted: true, messageId: sent.message_id };
 }
 
 // --- HTTP server -----------------------------------------------------------

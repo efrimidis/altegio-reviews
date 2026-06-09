@@ -1,3 +1,6 @@
+# Runtime state (tracked Telegram message id)
+state.json
+
 # Dependencies
 node_modules/
 npm-debug.log*
