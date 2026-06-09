@@ -5,8 +5,20 @@
 module.exports = {
   timezone: 'Asia/Tashkent',
 
-  // Cron expressions (in the timezone above) for when to publish.
-  postSchedules: ['0 9 * * *', '0 15 * * *'],
+  // When to publish (cron in the timezone above). Each schedule targets a day
+  // ('today' | 'tomorrow') and has its own header. {date} -> DD.MM of that day.
+  postSchedules: [
+    {
+      cron: '0 20 * * *', // evening: announce tomorrow's windows
+      day: 'tomorrow',
+      header: '🌚 🔥 Горящие окна на завтра со скидкой 15%\nна сеансы 60 минут | завтра {date}',
+    },
+    {
+      cron: '0 15 * * *', // afternoon: remaining windows for tonight
+      day: 'today',
+      header: '🔥 На сегодня еще остались горящие окошки со скидкой 15% | {date}',
+    },
+  ],
 
   // Studios to include, in display order. locationId = Altegio location/company id.
   studios: [
@@ -28,9 +40,6 @@ module.exports = {
   skipIfEmpty: true,
 
   // ----- Author-editable text (supports Telegram HTML) ----------------------
-  // {date} -> today's date as DD.MM
-  header: '🔥 На сегодня еще остались горящие окошки со скидкой 15% | {date}',
-
   footer: [
     '<blockquote expandable>🔥 Расслабляющий 60 минут - <s>700 000</s> 595 000 сум',
     '🔥 Расслабляющий 90 минут - <s>800 000</s> 680 000 сум',

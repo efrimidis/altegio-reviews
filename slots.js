@@ -63,9 +63,15 @@ async function buildStudioBlock(studio, apiDate, nowMs) {
 
 // Returns the formatted message string, or null if there are no slots and
 // config.skipIfEmpty is set.
-async function buildSlotsMessage(now = new Date()) {
-  const { apiDate, display } = dateParts(now);
-  const nowMs = now.getTime();
+// options: { day: 'today' | 'tomorrow', header: '...' }
+async function buildSlotsMessage(options = {}) {
+  const { day = 'today', header = config.postSchedules[0].header } = options;
+
+  // For 'tomorrow' we target the next calendar day; every slot then lies in the
+  // future relative to now, so the same "future-only" filter shows the full day.
+  const refDate = day === 'tomorrow' ? new Date(Date.now() + 24 * 60 * 60 * 1000) : new Date();
+  const { apiDate, display } = dateParts(refDate);
+  const nowMs = Date.now();
 
   const blocks = await Promise.all(
     config.studios.map((studio) => buildStudioBlock(studio, apiDate, nowMs)),
@@ -76,7 +82,7 @@ async function buildSlotsMessage(now = new Date()) {
     return null;
   }
 
-  const lines = [config.header.replace('{date}', display)];
+  const lines = [header.replace('{date}', display)];
 
   for (const block of withSlots) {
     lines.push('', block.name);

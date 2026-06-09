@@ -48,14 +48,14 @@ async function getReviews() {
 }
 
 // --- Slots publishing ------------------------------------------------------
-async function publishSlots() {
-  const message = await buildSlotsMessage();
+async function publishSlots(schedule) {
+  const message = await buildSlotsMessage(schedule);
   if (!message) {
-    console.log('No free slots today — skipping post.');
+    console.log(`No free slots (${schedule.day}) — skipping post.`);
     return { posted: false, reason: 'empty' };
   }
   await telegram.postToChannel(message);
-  console.log('Posted free slots to Telegram.');
+  console.log(`Posted free slots (${schedule.day}) to Telegram.`);
   return { posted: true };
 }
 
@@ -81,18 +81,21 @@ app.get('/altegio-reviews', async (req, res) => {
   }
 });
 
-// Manual trigger for testing. ?dry=1 previews the message without posting.
+// Manual trigger for testing. ?day=today|tomorrow picks the schedule.
+// ?dry=1 previews the message without posting.
 // Requires ?secret=<PUBLISH_SECRET> when that env var is set.
 app.get('/publish-slots', async (req, res) => {
   if (PUBLISH_SECRET && req.query.secret !== PUBLISH_SECRET) {
     return res.status(403).json({ error: 'Forbidden' });
   }
+  const day = req.query.day === 'tomorrow' ? 'tomorrow' : 'today';
+  const schedule = config.postSchedules.find((s) => s.day === day) || config.postSchedules[0];
   try {
     if (req.query.dry) {
-      const message = await buildSlotsMessage();
-      return res.json({ dryRun: true, message });
+      const message = await buildSlotsMessage(schedule);
+      return res.json({ dryRun: true, day, message });
     }
-    const result = await publishSlots();
+    const result = await publishSlots(schedule);
     res.json(result);
   } catch (error) {
     console.error('publishSlots failed:', error.message);
@@ -102,12 +105,13 @@ app.get('/publish-slots', async (req, res) => {
 
 // --- Scheduler -------------------------------------------------------------
 if (telegram.isConfigured) {
-  for (const expr of config.postSchedules) {
-    cron.schedule(expr, () => {
-      publishSlots().catch((err) => console.error('Scheduled publish failed:', err.message));
+  for (const schedule of config.postSchedules) {
+    cron.schedule(schedule.cron, () => {
+      publishSlots(schedule).catch((err) => console.error('Scheduled publish failed:', err.message));
     }, { timezone: config.timezone });
   }
-  console.log(`Slot scheduler active (${config.timezone}): ${config.postSchedules.join(', ')}`);
+  const summary = config.postSchedules.map((s) => `${s.cron} → ${s.day}`).join(', ');
+  console.log(`Slot scheduler active (${config.timezone}): ${summary}`);
 } else {
   console.warn('Telegram not configured — slot scheduler is disabled.');
 }
