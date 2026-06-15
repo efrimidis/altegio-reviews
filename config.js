@@ -53,6 +53,20 @@ module.exports = {
   // If true and no studio has any free slots, the post is skipped entirely.
   skipIfEmpty: true,
 
+  // ----- Daily payroll report (private group) -------------------------------
+  // Sent every evening to a private Telegram group (REPORT_BOT_TOKEN /
+  // REPORT_CHAT_ID) so each master can be paid out next morning without manual
+  // Altegio counting. Counts only attended visits (Altegio attendance === 1).
+  // ФОТ = `fotPercent`% of the undiscounted program price (Altegio
+  // `cost_per_unit` × amount) — independent of any discount the visit was
+  // actually closed with. `{date}` -> DD.MM of the reported day.
+  report: {
+    cron: '0 22 * * *', // 22:00 in `timezone`, reports the day that just ended
+    fotPercent: 30,
+    header: '💰 <b>Отчёт по сменам за {date}</b>',
+    emptyStudioNote: '— нет состоявшихся записей',
+  },
+
   // ----- Price list (base prices; discount applied at render) ---------------
   // `null` entries render as a blank separator line. Shown in an expandable
   // Telegram quote so prices don't dominate the post.

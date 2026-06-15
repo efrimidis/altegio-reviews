@@ -53,4 +53,15 @@ async function fetchBookTimes(locationId, staffId, date, serviceId) {
   return apiGet(`/book_times/${locationId}/${staffId}/${date}${query}`, partnerAuth);
 }
 
-module.exports = { fetchReviews, fetchBookStaff, fetchBookTimes };
+// --- Records (visits / payroll) --------------------------------------------
+// All records for a company in a [startDate, endDate] window (YYYY-MM-DD).
+// Needs the user token (private data). Each record carries staff, attendance
+// and per-service pricing (cost / cost_per_unit / first_cost / discount).
+async function fetchRecords(companyId, startDate, endDate) {
+  return apiGet(
+    `/records/${companyId}?start_date=${startDate}&end_date=${endDate}&count=300`,
+    partnerUserAuth,
+  );
+}
+
+module.exports = { fetchReviews, fetchBookStaff, fetchBookTimes, fetchRecords };

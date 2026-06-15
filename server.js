@@ -6,6 +6,7 @@ const cron = require('node-cron');
 const config = require('./config');
 const { fetchReviews } = require('./altegio');
 const { buildSlotsMessage } = require('./slots');
+const { buildReportMessage } = require('./report');
 const telegram = require('./telegram');
 const state = require('./state');
 
@@ -76,6 +77,16 @@ async function publishSlots(schedule) {
   return { posted: true, messageId: sent.message_id };
 }
 
+// --- Payroll report --------------------------------------------------------
+// Posts the end-of-day payroll report to the private group. Unlike the slots
+// post, reports are kept (one per day) — no previous-message deletion.
+async function publishReport() {
+  const message = await buildReportMessage();
+  const sent = await telegram.postReport(message);
+  console.log(`Posted payroll report to Telegram (id ${sent.message_id}).`);
+  return { posted: true, messageId: sent.message_id };
+}
+
 // --- HTTP server -----------------------------------------------------------
 const app = express();
 app.use(cors());
@@ -120,6 +131,25 @@ app.get('/publish-slots', async (req, res) => {
   }
 });
 
+// Manual trigger for the payroll report. ?dry=1 previews without posting.
+// Requires ?secret=<PUBLISH_SECRET> when that env var is set.
+app.get('/publish-report', async (req, res) => {
+  if (PUBLISH_SECRET && req.query.secret !== PUBLISH_SECRET) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    if (req.query.dry) {
+      const message = await buildReportMessage();
+      return res.json({ dryRun: true, message });
+    }
+    const result = await publishReport();
+    res.json(result);
+  } catch (error) {
+    console.error('publishReport failed:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- Scheduler -------------------------------------------------------------
 if (telegram.isConfigured) {
   for (const schedule of config.postSchedules) {
@@ -131,6 +161,15 @@ if (telegram.isConfigured) {
   console.log(`Slot scheduler active (${config.timezone}): ${summary}`);
 } else {
   console.warn('Telegram not configured — slot scheduler is disabled.');
+}
+
+if (telegram.isReportConfigured) {
+  cron.schedule(config.report.cron, () => {
+    publishReport().catch((err) => console.error('Scheduled report failed:', err.message));
+  }, { timezone: config.timezone });
+  console.log(`Payroll report scheduler active (${config.timezone}): ${config.report.cron}`);
+} else {
+  console.warn('Report Telegram not configured — payroll report scheduler is disabled.');
 }
 
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
