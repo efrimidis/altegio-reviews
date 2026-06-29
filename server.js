@@ -1,4 +1,5 @@
 require('dotenv').config();
+const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const cron = require('node-cron');
@@ -6,7 +7,7 @@ const cron = require('node-cron');
 const config = require('./config');
 const { fetchReviews } = require('./altegio');
 const { buildSlotsMessage } = require('./slots');
-const { buildReportMessage } = require('./report');
+const { buildReportMessage, togglePayButton } = require('./report');
 const telegram = require('./telegram');
 const state = require('./state');
 
@@ -81,17 +82,58 @@ async function publishSlots(schedule) {
 // Posts the end-of-day payroll report to the private group. Unlike the slots
 // post, reports are kept (one per day) — no previous-message deletion.
 async function publishReport() {
-  const message = await buildReportMessage();
-  const sent = await telegram.postReport(message);
+  const { text, keyboard } = await buildReportMessage();
+  const replyMarkup = keyboard.length ? { inline_keyboard: keyboard } : undefined;
+  const sent = await telegram.postReport(text, replyMarkup);
   console.log(`Posted payroll report to Telegram (id ${sent.message_id}).`);
   return { posted: true, messageId: sent.message_id };
+}
+
+// Webhook path + secret for the report bot's "mark paid" buttons. The secret is
+// derived from the bot token (stable, no extra config) and verified on each hit.
+const REPORT_WEBHOOK_PATH = '/telegram/report-callback';
+const REPORT_WEBHOOK_SECRET = process.env.REPORT_BOT_TOKEN
+  ? crypto.createHash('sha256').update(process.env.REPORT_BOT_TOKEN).digest('hex').slice(0, 32)
+  : null;
+
+// Toggle the tapped master's checkbox (⬜ <-> ✅) in place.
+async function handleReportCallback(update) {
+  const cq = update.callback_query;
+  if (!cq) return;
+  const match = /^pay:(\d+)$/.exec(cq.data || '');
+  const keyboard = cq.message && cq.message.reply_markup && cq.message.reply_markup.inline_keyboard;
+  if (match && keyboard) {
+    const button = keyboard[Number(match[1])] && keyboard[Number(match[1])][0];
+    if (button) {
+      const paid = togglePayButton(button);
+      await telegram.editReportMarkup(cq.message.chat.id, cq.message.message_id, {
+        inline_keyboard: keyboard,
+      });
+      await telegram.answerReportCallback(cq.id, paid ? 'Отмечено как выплачено ✅' : 'Снято ⬜');
+      return;
+    }
+  }
+  await telegram.answerReportCallback(cq.id);
 }
 
 // --- HTTP server -----------------------------------------------------------
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 app.get('/', (req, res) => res.json({ status: 'ok' }));
+
+// Telegram pushes "mark paid" button taps here. Verify the secret header, ack
+// immediately, then process (Telegram retries on non-2xx, so never block).
+app.post(REPORT_WEBHOOK_PATH, (req, res) => {
+  if (REPORT_WEBHOOK_SECRET && req.get('X-Telegram-Bot-Api-Secret-Token') !== REPORT_WEBHOOK_SECRET) {
+    return res.sendStatus(403);
+  }
+  res.sendStatus(200);
+  handleReportCallback(req.body).catch((err) =>
+    console.error('Report callback failed:', err.message),
+  );
+});
 
 app.get('/altegio-reviews', async (req, res) => {
   const now = Date.now();
@@ -139,8 +181,8 @@ app.get('/publish-report', async (req, res) => {
   }
   try {
     if (req.query.dry) {
-      const message = await buildReportMessage();
-      return res.json({ dryRun: true, message });
+      const { text } = await buildReportMessage();
+      return res.json({ dryRun: true, message: text });
     }
     const result = await publishReport();
     res.json(result);
@@ -168,6 +210,18 @@ if (telegram.isReportConfigured) {
     publishReport().catch((err) => console.error('Scheduled report failed:', err.message));
   }, { timezone: config.timezone });
   console.log(`Payroll report scheduler active (${config.timezone}): ${config.report.cron}`);
+
+  // Register the callback webhook so the "mark paid" buttons work. Needs a
+  // public URL — Render provides RENDER_EXTERNAL_URL; locally we skip it.
+  const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL;
+  if (baseUrl) {
+    telegram
+      .setReportWebhook(`${baseUrl}${REPORT_WEBHOOK_PATH}`, REPORT_WEBHOOK_SECRET)
+      .then(() => console.log(`Report webhook set: ${baseUrl}${REPORT_WEBHOOK_PATH}`))
+      .catch((err) => console.error('setReportWebhook failed:', err.message));
+  } else {
+    console.warn('No public URL (RENDER_EXTERNAL_URL) — report buttons disabled until set.');
+  }
 } else {
   console.warn('Report Telegram not configured — payroll report scheduler is disabled.');
 }

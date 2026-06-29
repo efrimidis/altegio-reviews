@@ -27,12 +27,13 @@ async function callApi(token, method, body) {
   return result.result;
 }
 
-function sendMessage(token, chatId, text) {
+function sendMessage(token, chatId, text, replyMarkup) {
   return callApi(token, 'sendMessage', {
     chat_id: chatId,
     text,
     parse_mode: 'HTML',
     disable_web_page_preview: true,
+    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
   });
 }
 
@@ -43,11 +44,11 @@ async function postToChannel(text) {
   return sendMessage(BOT_TOKEN, CHANNEL_ID, text);
 }
 
-async function postReport(text) {
+async function postReport(text, replyMarkup) {
   if (!isReportConfigured) {
     throw new Error('Report Telegram is not configured (REPORT_BOT_TOKEN / REPORT_CHAT_ID)');
   }
-  return sendMessage(REPORT_BOT_TOKEN, REPORT_CHAT_ID, text);
+  return sendMessage(REPORT_BOT_TOKEN, REPORT_CHAT_ID, text, replyMarkup);
 }
 
 async function deleteMessage(messageId) {
@@ -55,4 +56,39 @@ async function deleteMessage(messageId) {
   await callApi(BOT_TOKEN, 'deleteMessage', { chat_id: CHANNEL_ID, message_id: messageId });
 }
 
-module.exports = { postToChannel, postReport, deleteMessage, isConfigured, isReportConfigured };
+// --- Report callback buttons (tap-to-mark-paid) ----------------------------
+function editReportMarkup(chatId, messageId, replyMarkup) {
+  return callApi(REPORT_BOT_TOKEN, 'editMessageReplyMarkup', {
+    chat_id: chatId,
+    message_id: messageId,
+    reply_markup: replyMarkup,
+  });
+}
+
+function answerReportCallback(callbackId, text) {
+  return callApi(REPORT_BOT_TOKEN, 'answerCallbackQuery', {
+    callback_query_id: callbackId,
+    ...(text ? { text } : {}),
+  });
+}
+
+// Point the report bot's callbacks at our webhook. `secret` is echoed back by
+// Telegram in the X-Telegram-Bot-Api-Secret-Token header so we can verify it.
+function setReportWebhook(url, secret) {
+  return callApi(REPORT_BOT_TOKEN, 'setWebhook', {
+    url,
+    secret_token: secret,
+    allowed_updates: ['callback_query'],
+  });
+}
+
+module.exports = {
+  postToChannel,
+  postReport,
+  deleteMessage,
+  editReportMarkup,
+  answerReportCallback,
+  setReportWebhook,
+  isConfigured,
+  isReportConfigured,
+};

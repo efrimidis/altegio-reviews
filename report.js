@@ -90,6 +90,7 @@ async function buildReportMessage(now = new Date()) {
   );
 
   const lines = [config.report.header.replace('{date}', display)];
+  const payees = []; // flat list (studio order) -> one tappable checkbox each
   let grandSessions = 0;
   let grandFot = 0;
 
@@ -109,6 +110,7 @@ async function buildReportMessage(now = new Date()) {
     for (const m of studio.masters) {
       studioSessions += m.sessions;
       studioFot += m.fot;
+      payees.push({ name: m.name, fot: m.fot });
 
       // Skip free add-ons (душ, «тишина», …): they carry no payout and add noise.
       // Each line shows the full (100%) price and the master's cut right after it.
@@ -147,7 +149,24 @@ async function buildReportMessage(now = new Date()) {
       `к выплате ${fmtMoney(grandFot)} сум`,
   );
 
-  return lines.join('\n');
+  if (payees.length) {
+    lines.push('', 'Отметьте галочкой, кому уже выплатили 👇');
+  }
+
+  // One full-width checkbox button per master (starts unchecked).
+  const keyboard = payees.map((p, i) => [
+    { text: `⬜ ${p.name} · ${fmtMoney(p.fot)}`, callback_data: `pay:${i}` },
+  ]);
+
+  return { text: lines.join('\n'), keyboard };
 }
 
-module.exports = { buildReportMessage };
+// Flip a checkbox button's prefix between unchecked (⬜) and paid (✅).
+function togglePayButton(button) {
+  const paid = button.text.startsWith('✅');
+  const label = button.text.replace(/^(✅|⬜)\s*/, '');
+  button.text = `${paid ? '⬜' : '✅'} ${label}`;
+  return !paid; // new paid state
+}
+
+module.exports = { buildReportMessage, togglePayButton };
