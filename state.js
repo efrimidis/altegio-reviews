@@ -1,6 +1,6 @@
-// Tiny JSON-file store for the id of the currently published post, so the next
-// run can delete it. The file lives on Render's ephemeral disk: it survives
-// process restarts within a deploy and is only lost on redeploy (rare).
+// Tiny JSON-file store for publication state. This is deliberately local and
+// suitable only for a single service instance. Writes are atomic so a process
+// interruption cannot leave a half-written JSON document behind.
 
 const fs = require('fs');
 const path = require('path');
@@ -16,11 +16,24 @@ function read() {
 }
 
 function write(state) {
+  const temporaryFile = `${FILE}.${process.pid}.${Date.now()}.tmp`;
   try {
-    fs.writeFileSync(FILE, JSON.stringify(state));
+    fs.writeFileSync(temporaryFile, JSON.stringify(state));
+    fs.renameSync(temporaryFile, FILE);
+    return true;
   } catch (err) {
     console.error('Failed to write state.json:', err.message);
+    try {
+      if (fs.existsSync(temporaryFile)) fs.unlinkSync(temporaryFile);
+    } catch {
+      // Best-effort cleanup; the original state file is still intact.
+    }
+    return false;
   }
 }
 
-module.exports = { read, write };
+function update(updater) {
+  return write(updater(read()));
+}
+
+module.exports = { read, write, update };

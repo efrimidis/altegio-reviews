@@ -1,11 +1,13 @@
 {
   "name": "altegio-reviews",
   "version": "1.0.0",
-  "description": "Proxy that fetches and caches salon reviews from the Altegio B2B v1 API.",
+  "description": "Altegio-to-Telegram automation for reviews, free slots and daily payroll reports.",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test",
+    "check": "node --check server.js && node --check altegio.js && node --check slots.js && node --check report.js && node --check telegram.js && node --check state.js && node --check security.js && node --test"
   },
   "engines": {
     "node": ">=18"

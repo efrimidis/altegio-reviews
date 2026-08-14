@@ -15,6 +15,27 @@ const LATEST_MINUTES = toMinutes(config.latestSlotTime);
 // 700000 -> "700 000"
 const fmtMoney = (n) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
+function selectSlotTimes(slots, nowMs, latestMinutes = LATEST_MINUTES) {
+  const seenHours = new Set();
+  return slots
+    .filter((slot) => new Date(slot.datetime).getTime() > nowMs)
+    .filter((slot) => toMinutes(slot.time) <= latestMinutes)
+    .sort((a, b) => toMinutes(a.time) - toMinutes(b.time))
+    .filter((slot) => {
+      const hour = slot.time.split(':')[0];
+      if (seenHours.has(hour)) return false;
+      seenHours.add(hour);
+      return true;
+    })
+    .map((slot) => slot.time);
+}
+
+function getDiscountPercent(totalSlots) {
+  return totalSlots <= config.discount.scarceThreshold
+    ? config.discount.scarce
+    : config.discount.normal;
+}
+
 // Render the price list (in an expandable quote) with the given discount %.
 function renderFooter(discountPercent) {
   const priceBlock = config.priceList
@@ -59,17 +80,7 @@ async function buildStudioBlock(studio, apiDate, nowMs) {
       }
       // Keep only future slots no later than the cutoff, then the earliest
       // available time per hour.
-      const seenHours = new Set();
-      const times = slots
-        .filter((s) => new Date(s.datetime).getTime() > nowMs)
-        .filter((s) => toMinutes(s.time) <= LATEST_MINUTES)
-        .filter((s) => {
-          const hour = s.time.split(':')[0];
-          if (seenHours.has(hour)) return false;
-          seenHours.add(hour);
-          return true;
-        })
-        .map((s) => s.time);
+      const times = selectSlotTimes(slots, nowMs);
       return times.length ? { name: member.name, times } : null;
     }),
   );
@@ -80,15 +91,15 @@ async function buildStudioBlock(studio, apiDate, nowMs) {
 // Returns the formatted message string, or null if there are no slots and
 // config.skipIfEmpty is set.
 // options: { day: 'today' | 'tomorrow', header: '...' }
-async function buildSlotsMessage(options = {}) {
+async function buildSlotsMessage(options = {}, now = new Date()) {
   const schedule = options.day ? options : config.postSchedules[0];
   const { day } = schedule;
 
   // For 'tomorrow' we target the next calendar day; every slot then lies in the
   // future relative to now, so the same "future-only" filter shows the full day.
-  const refDate = day === 'tomorrow' ? new Date(Date.now() + 24 * 60 * 60 * 1000) : new Date();
+  const nowMs = now.getTime();
+  const refDate = day === 'tomorrow' ? new Date(nowMs + 24 * 60 * 60 * 1000) : now;
   const { apiDate, display } = dateParts(refDate);
-  const nowMs = Date.now();
 
   const blocks = await Promise.all(
     config.studios.map((studio) => buildStudioBlock(studio, apiDate, nowMs)),
@@ -105,7 +116,7 @@ async function buildSlotsMessage(options = {}) {
     0,
   );
   const isScarce = totalSlots <= config.discount.scarceThreshold;
-  const discountPercent = isScarce ? config.discount.scarce : config.discount.normal;
+  const discountPercent = getDiscountPercent(totalSlots);
   const headerTemplate = (isScarce && schedule.headerScarce) || schedule.header;
 
   const lines = [headerTemplate.replace('{discount}', discountPercent).replace('{date}', display)];
@@ -121,4 +132,4 @@ async function buildSlotsMessage(options = {}) {
   return lines.join('\n');
 }
 
-module.exports = { buildSlotsMessage };
+module.exports = { buildSlotsMessage, selectSlotTimes, getDiscountPercent, dateParts };

@@ -1,8 +1,8 @@
 // Builds the daily "payroll per shift" report from Altegio records.
 //
 // For each studio we list every master who had attended visits today, with the
-// number of sessions, the factual turnover (what clients actually paid) and the
-// ФОТ to pay out. ФОТ = config.report.fotPercent% of the *undiscounted* program
+// number of sessions and the ФОТ to pay out. ФОТ = config.report.fotPercent% of
+// the *undiscounted* program
 // price (Altegio `cost_per_unit`), so any discount the visit was closed with
 // does not lower what the master earns.
 
@@ -47,16 +47,7 @@ function dateParts(now = new Date()) {
 
 const ATTENDED = 1; // Altegio attendance: client actually came.
 
-// For one studio: { name, masters: [{ name, sessions, revenue, fot, items }] }.
-async function buildStudioReport(studio, apiDate) {
-  let records;
-  try {
-    records = await fetchRecords(studio.locationId, apiDate, apiDate);
-  } catch (err) {
-    console.error(`records failed (loc ${studio.locationId}):`, err.message);
-    return { name: studio.name, masters: [], failed: true };
-  }
-
+function summarizeRecords(records) {
   const fotRate = config.report.fotPercent / 100;
   const byMaster = new Map();
 
@@ -68,16 +59,30 @@ async function buildStudioReport(studio, apiDate) {
     }
     const master = byMaster.get(staff.id);
     master.sessions += 1;
-    for (const s of rec.services || []) {
-      const amount = s.amount || 1;
+    for (const service of rec.services || []) {
+      const amount = service.amount == null ? 1 : service.amount;
       // Undiscounted catalog price drives the payout, regardless of any discount.
-      const base = (s.cost_per_unit || s.first_cost || 0) * amount;
+      const unitPrice = service.cost_per_unit ?? service.first_cost ?? 0;
+      const base = unitPrice * amount;
       master.fot += base * fotRate;
-      master.items.push({ title: s.title, base });
+      master.items.push({ title: service.title, base });
     }
   }
 
-  return { name: studio.name, masters: [...byMaster.values()], failed: false };
+  return [...byMaster.values()];
+}
+
+// For one studio: { name, masters: [{ name, sessions, fot, items }] }.
+async function buildStudioReport(studio, apiDate) {
+  let records;
+  try {
+    records = await fetchRecords(studio.locationId, apiDate, apiDate);
+  } catch (err) {
+    console.error(`records failed (loc ${studio.locationId}):`, err.message);
+    return { name: studio.name, masters: [], failed: true };
+  }
+
+  return { name: studio.name, masters: summarizeRecords(records), failed: false };
 }
 
 // Returns the formatted report string. Always returns a message (even on an
@@ -169,4 +174,10 @@ function togglePayButton(button) {
   return !paid; // new paid state
 }
 
-module.exports = { buildReportMessage, togglePayButton };
+module.exports = {
+  buildReportMessage,
+  togglePayButton,
+  summarizeRecords,
+  pluralSessions,
+  dateParts,
+};

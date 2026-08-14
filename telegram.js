@@ -10,21 +10,60 @@ const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID; // @username or numeric -100
 
 const REPORT_BOT_TOKEN = process.env.REPORT_BOT_TOKEN || BOT_TOKEN;
 const REPORT_CHAT_ID = process.env.REPORT_CHAT_ID; // numeric group/supergroup id
+const configuredTimeout = process.env.TELEGRAM_REQUEST_TIMEOUT_SECONDS;
+const timeoutSeconds = configuredTimeout == null || configuredTimeout === ''
+  ? 10
+  : Number(configuredTimeout);
+if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) {
+  throw new Error('TELEGRAM_REQUEST_TIMEOUT_SECONDS must be a positive number');
+}
+const REQUEST_TIMEOUT_MS = timeoutSeconds * 1000;
+const MAX_RATE_LIMIT_RETRIES = 2;
 
 const isConfigured = Boolean(BOT_TOKEN && CHANNEL_ID);
 const isReportConfigured = Boolean(REPORT_BOT_TOKEN && REPORT_CHAT_ID);
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function callApi(token, method, body) {
-  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const result = await response.json();
-  if (!result.ok) {
-    throw new Error(`Telegram ${method} error: ${result.description || JSON.stringify(result)}`);
+  for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let response;
+    try {
+      response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        throw new Error(`Telegram ${method} timed out`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error(`Telegram ${method} returned invalid JSON (HTTP ${response.status})`);
+    }
+
+    if ((response.status === 429 || result.error_code === 429) && attempt < MAX_RATE_LIMIT_RETRIES) {
+      const retryAfter = Number(result.parameters && result.parameters.retry_after) || 1;
+      await wait(retryAfter * 1000);
+      continue;
+    }
+    if (!response.ok || !result.ok) {
+      throw new Error(`Telegram ${method} error: ${result.description || JSON.stringify(result)}`);
+    }
+    return result.result;
   }
-  return result.result;
+  throw new Error(`Telegram ${method} exceeded its retry limit`);
 }
 
 function sendMessage(token, chatId, text, replyMarkup) {

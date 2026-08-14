@@ -29,8 +29,8 @@ module.exports = {
   // Discount scales with scarcity: when the post has `scarceThreshold` windows
   // or fewer (counted across the whole post), bump to the deeper discount.
   discount: {
-    normal: 15,
-    scarce: 20,
+    normal: 10,
+    scarce: 15,
     scarceThreshold: 4,
   },
 
